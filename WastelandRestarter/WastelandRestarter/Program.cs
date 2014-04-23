@@ -172,8 +172,14 @@ namespace WastelandRestarter
         {
             var open = true;
 
+            int count = 0;
+
             while (open)
             {
+                if (count > 1200)
+                {
+                    throw new Exception(string.Format("Waited 120 seconds but file <{0}> wasn't unlocked, something didn't work with deploy", path));
+                }
                 try
                 {
                     using (File.Open(path, FileMode.Open))
@@ -182,6 +188,8 @@ namespace WastelandRestarter
                 }
                 catch (IOException)
                 {
+                    Thread.Sleep(100);
+                    count++;
                     continue;
                 }
 
