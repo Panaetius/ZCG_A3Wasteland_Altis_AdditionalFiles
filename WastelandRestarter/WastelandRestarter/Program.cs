@@ -128,11 +128,13 @@ namespace WastelandRestarter
             logger.Info("shutdown");
 
             var path = string.Format(
-                @"{0}MPMissions\ArmA3_Wasteland.Altis.pbo",
-                ConfigurationManager.AppSettings["Arma3Path"]);
+                @"{0}MPMissions\{1}.pbo",
+                ConfigurationManager.AppSettings["Arma3Path"],
+                ConfigurationManager.AppSettings["PBOName"]);
             var path2 = string.Format(
-                @"{0}Deploy\ArmA3_Wasteland.Altis.pbo",
-                ConfigurationManager.AppSettings["Arma3Path"]);
+                @"{0}Deploy\{1}.pbo",
+                ConfigurationManager.AppSettings["Arma3Path"],
+                ConfigurationManager.AppSettings["PBOName"]);
 
 
             if (File.Exists(path2))
@@ -144,9 +146,10 @@ namespace WastelandRestarter
                     File.Copy(
                         path,
                         string.Format(
-                            @"{0}MPMissions\Backup\ArmA3_Wasteland.Altis.{1}.pbo",
+                            @"{0}MPMissions\Backup\{2}.{1}.pbo",
                             ConfigurationManager.AppSettings["Arma3Path"],
-                            DateTime.Now.ToString("yy-mm-dd-hh-MM")));
+                            DateTime.Now.ToString("yy-mm-dd-hh-MM"),
+                            ConfigurationManager.AppSettings["PBOName"]));
 
                     WaitForFileNotLocked(path);
 
@@ -166,6 +169,11 @@ namespace WastelandRestarter
                 }
             }
             
+            b.Disconnect();
+
+            b = null;
+
+            return;
         }
 
         private static void WaitForFileNotLocked(string path)
@@ -180,6 +188,7 @@ namespace WastelandRestarter
                 {
                     throw new Exception(string.Format("Waited 120 seconds but file <{0}> wasn't unlocked, something didn't work with deploy", path));
                 }
+
                 try
                 {
                     using (File.Open(path, FileMode.Open))
