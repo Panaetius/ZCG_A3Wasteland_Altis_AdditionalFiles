@@ -48,6 +48,123 @@ namespace WastelandRestarter
 
             Thread.Sleep(5);
 
+            KickPlayers(b);
+
+            if (SaveBases(b))
+            {
+                return;
+            }
+
+            b.SendCommand("#shutdown");
+
+            logger.Info("shutdown");
+
+            DeployNewMissionFile();
+
+            b.Disconnect();
+
+            b = null;
+
+            return;
+        }
+
+        private static void DeployNewMissionFile()
+        {
+            var path = string.Format(
+                @"{0}MPMissions\{1}.pbo",
+                ConfigurationManager.AppSettings["Arma3Path"],
+                ConfigurationManager.AppSettings["PBOName"]);
+            var path2 = string.Format(
+                @"{0}Deploy\{1}.pbo",
+                ConfigurationManager.AppSettings["Arma3Path"],
+                ConfigurationManager.AppSettings["PBOName"]);
+
+            if (File.Exists(path2))
+            {
+                try
+                {
+                    WaitForFileNotLocked(path);
+
+                    File.Copy(
+                        path,
+                        string.Format(
+                            @"{0}MPMissions\Backup\{2}.{1}.pbo",
+                            ConfigurationManager.AppSettings["Arma3Path"],
+                            DateTime.Now.ToString("yy-mm-dd-hh-MM"),
+                            ConfigurationManager.AppSettings["PBOName"]));
+
+                    WaitForFileNotLocked(path);
+
+                    File.Copy(path2, path, true);
+
+                    WaitForFileNotLocked(path);
+
+                    File.Delete(path2);
+                }
+                catch (Exception ex)
+                {
+                    logger.Info(path);
+                    logger.ErrorException("Couldn't copy mission file", ex);
+                }
+            }
+        }
+
+        private static bool SaveBases(BattlEyeClient b)
+        {
+            var conn = new MySqlConnection(ConfigurationManager.AppSettings["DBConnectionString"]);
+            conn.Open();
+
+            var command = conn.CreateCommand();
+            command.CommandText = @"UPDATE `triggers` SET `Condition`=1 WHERE Name=""DoSave""";
+            command.ExecuteNonQuery();
+
+            logger.Info("Saving Bases and Vehicles");
+
+            command.CommandText = @"SELECT `Condition` FROM `triggers` WHERE Name=""DoSave""";
+
+            var cond = false;
+
+            var start = DateTime.Now;
+
+            int timeoutSeconds;
+
+            if (!int.TryParse(ConfigurationManager.AppSettings["TimeoutSeconds"], out timeoutSeconds))
+            {
+                timeoutSeconds = 1800;
+            }
+
+            while (!cond)
+            {
+                object result = null;
+                try
+                {
+                    result = command.ExecuteScalar();
+                    cond = ((uint)result) == 0; //wait for save to be done
+
+                    if (DateTime.Now.Subtract(start).TotalSeconds > timeoutSeconds)
+                    {
+                        b.SendCommand("#unlock");
+                        while (b.CommandQueue > 0)
+                        {
+                            /* wait until server received packet */
+                        }
+
+                        logger.Info("Unlocked Server again since mission doesn't seem to be running");
+
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.ErrorException(string.Format("Waiting for save to be finished: {0}", result), ex);
+                }
+                Thread.Sleep(1000);
+            }
+            return false;
+        }
+
+        private static void KickPlayers(BattlEyeClient b)
+        {
             List<int> playerIds = null;
 
             while (playerIds == null || playerIds.Any())
@@ -56,7 +173,11 @@ namespace WastelandRestarter
 
                 Console.WriteLine("Players:");
                 b.SendCommand("players ");
-                while (b.CommandQueue > 0) { /* wait until server received packet */ };
+                while (b.CommandQueue > 0)
+                {
+                    /* wait until server received packet */
+                }
+                ;
 
                 var regex1 = Regex.Match(LastResult, @"Players\son\sserver:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
@@ -94,86 +215,6 @@ namespace WastelandRestarter
             }
 
             logger.Info("Kicked players");
-
-            var conn = new MySqlConnection(ConfigurationManager.AppSettings["DBConnectionString"]);
-            conn.Open();
-
-            var command = conn.CreateCommand();
-            command.CommandText = @"UPDATE `triggers` SET `Condition`=1 WHERE Name=""DoSave""";
-            command.ExecuteNonQuery();
-
-            logger.Info("Saving Bases and Vehicles");
-
-            command.CommandText = @"SELECT `Condition` FROM `triggers` WHERE Name=""DoSave""";
-
-            var cond = false;
-
-            while (!cond)
-            {
-                object result = null;
-                try
-                {
-                    result = command.ExecuteScalar();
-                    cond = ((uint)result) == 0; //wait for save to be done
-                }
-                catch (Exception ex)
-                {
-                    logger.ErrorException(string.Format("Waiting for save to be finished: {0}", result), ex);
-                }
-                Thread.Sleep(1000);
-            }
-
-            b.SendCommand("#shutdown");
-
-            logger.Info("shutdown");
-
-            var path = string.Format(
-                @"{0}MPMissions\{1}.pbo",
-                ConfigurationManager.AppSettings["Arma3Path"],
-                ConfigurationManager.AppSettings["PBOName"]);
-            var path2 = string.Format(
-                @"{0}Deploy\{1}.pbo",
-                ConfigurationManager.AppSettings["Arma3Path"],
-                ConfigurationManager.AppSettings["PBOName"]);
-
-
-            if (File.Exists(path2))
-            {
-                try
-                {
-                    WaitForFileNotLocked(path);
-
-                    File.Copy(
-                        path,
-                        string.Format(
-                            @"{0}MPMissions\Backup\{2}.{1}.pbo",
-                            ConfigurationManager.AppSettings["Arma3Path"],
-                            DateTime.Now.ToString("yy-mm-dd-hh-MM"),
-                            ConfigurationManager.AppSettings["PBOName"]));
-
-                    WaitForFileNotLocked(path);
-
-                    File.Copy(
-                        path2,
-                        path,
-                        true);
-
-                    WaitForFileNotLocked(path);
-
-                    File.Delete(path2);
-                }
-                catch (Exception ex)
-                {
-                    logger.Info(path);
-                    logger.ErrorException("Couldn't copy mission file", ex);
-                }
-            }
-            
-            b.Disconnect();
-
-            b = null;
-
-            return;
         }
 
         private static void WaitForFileNotLocked(string path)
