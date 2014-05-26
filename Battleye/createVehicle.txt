@@ -19,4 +19,4 @@
 
 // Buildings & objects
 
-5 "^Land_" !"Land_(Money|Basket|CanisterPlastic|Suitcase|CanisterFuel|CanisterOil|CashDesk|Can_V3|TentDome|BottlePlastic_V2|BakedBeans)_F"
+5 "^Land_" !"Land_(Money|Basket|CanisterPlastic|Suitcase|CanisterFuel|CanisterOil|CashDesk|Can_V3|TentDome|BottlePlastic_V2|BakedBeans|Rope)_F"
